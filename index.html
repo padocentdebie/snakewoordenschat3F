@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Woordenschat Snake — Begrippen Training</title>
+    <style>
+        :root {
+            --bg-dark: #0b1120;
+            --panel: #111a2e;
+            --panel-border: #233252;
+            --accent: #38bdf8;
+            --emerald: #10b981;
+            --emerald-glow: rgba(16, 185, 129, 0.35);
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --text: #f8fafc;
+            --muted: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: radial-gradient(circle at top, #16223d 0%, var(--bg-dark) 75%);
+            color: var(--text);
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        .app {
+            display: flex;
+            flex-direction: column;
+            width: 100vw;
+            height: 100vh;
+            padding: 10px 16px 10px 16px;
+            gap: 10px;
+        }
+
+        /* Bovenbalk met het te zoeken woord en spelstatistieken */
+        .hud {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+            gap: 14px;
+            background: var(--panel);
+            border: 1.5px solid var(--panel-border);
+            border-radius: 14px;
+            padding: 10px 18px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+            flex-shrink: 0;
+        }
+
+        .stats-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .stat-pill {
+            background: #0b1324;
+            border: 1px solid #263554;
+            border-radius: 10px;
+            padding: 6px 12px;
+            display: flex;
+            flex-direction: column;
+            line-height: 1.2;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.7px;
+            color: var(--muted);
+            font-weight: 700;
+        }
+
+        .stat-value {
+            font-size: 17px;
+            font-weight: 800;
+            color: var(--accent);
+        }
+
+        .stat-value.green { color: #34d399; }
+        .stat-value.gold { color: #fbbf24; }
+
+        /* Het doelwoord prominent boven het veld */
+        .target-word-box {
+            text-align: center;
+            padding: 6px 28px;
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.16), rgba(56, 189, 248, 0.14));
+            border: 2px solid var(--accent);
+            border-radius: 12px;
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.2);
+            min-width: 290px;
+        }
+
+        .target-subtitle {
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 1.2px;
+            color: var(--accent);
+            text-transform: uppercase;
+        }
+
+        .target-word {
+            font-size: 28px;
+            font-weight: 900;
+            letter-spacing: 0.6px;
+            color: #ffffff;
+            text-shadow: 0 2px 10px rgba(56, 189, 248, 0.35);
+            line-height: 1.15;
+            margin-top: 2px;
+        }
+
+        .target-word.pop {
+            animation: wordPop 0.35s ease;
+        }
+
+        @keyframes wordPop {
+            0% { transform: scale(0.9); color: #34d399; }
+            60% { transform: scale(1.08); }
+            100% { transform: scale(1); color: #ffffff; }
+        }
+
+        .controls-right {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .ctrl-select, .ctrl-btn {
+            background: #0b1324;
+            color: var(--text);
+            border: 1.5px solid #2e4066;
+            border-radius: 9px;
+            padding: 7px 11px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.15s;
+            font-family: inherit;
+        }
+
+        .ctrl-btn:hover, .ctrl-select:hover {
+            border-color: var(--accent);
+            background: #162340;
+        }
+
+        .ctrl-btn.active {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: var(--emerald);
+            color: #6ee7b7;
+        }
+
+        /* Groot speelveld */
+        .board-wrapper {
+            position: relative;
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+        }
+
+        canvas#gameCanvas {
+            background: #070d19;
+            border: 2.5px solid #2b3f66;
+            border-radius: 14px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+            display: block;
+        }
+
+        /* Overlays (Start, Pauze, Game Over, Gewonnen) */
+        .overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(7, 13, 25, 0.86);
+            backdrop-filter: blur(6px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+            border-radius: 14px;
+        }
+
+        .overlay.hidden {
+            display: none;
+        }
+
+        .modal {
+            background: linear-gradient(160deg, #16213a, #0e1629);
+            border: 2px solid var(--accent);
+            border-radius: 18px;
+            padding: 28px 32px;
+            max-width: 620px;
+            width: 92%;
+            text-align: center;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65);
+        }
+
+        .modal.danger { border-color: var(--danger); }
+        .modal.success { border-color: var(--emerald); }
+
+        .modal h1 {
+            margin: 0 0 10px 0;
+            font-size: 28px;
+            font-weight: 900;
+        }
+
+        .modal p {
+            color: #cbd5e1;
+            font-size: 15px;
+            line-height: 1.5;
+            margin: 8px 0;
+        }
+
+        .feedback-box {
+            background: #09101f;
+            border: 1.5px solid #2b3c5e;
+            border-radius: 12px;
+            padding: 14px 16px;
+            margin: 14px 0 18px 0;
+            text-align: left;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .feedback-row {
+            margin-bottom: 8px;
+        }
+        .feedback-row:last-child { margin-bottom: 0; }
+
+        .badge-good {
+            display: inline-block;
+            background: rgba(16, 185, 129, 0.2);
+            color: #34d399;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-weight: 800;
+            font-size: 12px;
+            margin-right: 6px;
+        }
+
+        .badge-bad {
+            display: inline-block;
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-weight: 800;
+            font-size: 12px;
+            margin-right: 6px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 13px 28px;
+            font-size: 16px;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: 0 6px 20px var(--emerald-glow);
+            transition: transform 0.15s, filter 0.15s;
+            font-family: inherit;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.08);
+        }
+
+        .keys-hint {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12.5px;
+            color: var(--muted);
+            padding: 0 6px;
+            flex-shrink: 0;
+        }
+
+        kbd {
+            background: #1e293b;
+            border: 1px solid #3b4f78;
+            border-radius: 5px;
+            padding: 2px 7px;
+            font-family: inherit;
+            font-weight: 700;
+            color: #e2e8f0;
+            font-size: 11.5px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="app">
+    <!-- Bovenbalk -->
+    <div class="hud">
+        <div class="stats-left">
+            <div class="stat-pill">
+                <span class="stat-label">Score</span>
+                <span class="stat-value green" id="scoreVal">0</span>
+            </div>
+            <div class="stat-pill">
+                <span class="stat-label">Highscore</span>
+                <span class="stat-value gold" id="highScoreVal">0</span>
+            </div>
+            <div class="stat-pill">
+                <span class="stat-label">Woorden</span>
+                <span class="stat-value" id="progressVal">0 / 42</span>
+            </div>
+            <div class="stat-pill">
+                <span class="stat-label">Lengte</span>
+                <span class="stat-value" id="lengthVal">4</span>
+            </div>
+        </div>
+
+        <div class="target-word-box">
+            <div class="target-subtitle">Eet de juiste beschrijving van:</div>
+            <div class="target-word" id="targetWordDisplay">KLIK OP START</div>
+        </div>
+
+        <div class="controls-right">
+            <select id="speedSelect" class="ctrl-select" title="Snelheid van de slang">
+                <option value="200">🐢 Rustig (extra leestijd)</option>
+                <option value="145" selected>🐍 Normaal</option>
+                <option value="100">⚡ Snel</option>
+            </select>
+            <button id="wallToggleBtn" class="ctrl-btn" onclick="toggleWallMode()" title="Kies of botsen tegen de rand af is of dat je erdoorheen mag">
+                🧱 Muren: Af
+            </button>
+            <button id="soundToggleBtn" class="ctrl-btn active" onclick="toggleSound()">
+                🔊 Geluid: Aan
+            </button>
+            <button id="pauseBtn" class="ctrl-btn" onclick="togglePause()">
+                ⏸️ Pauze
+            </button>
+            <button class="ctrl-btn" onclick="restartGame()">
+                🔄 Opnieuw
+            </button>
+        </div>
+    </div>
+
+    <!-- Groot Speelveld -->
+    <div class="board-wrapper" id="boardWrapper">
+        <canvas id="gameCanvas" width="1920" height="960"></canvas>
+
+        <!-- Start / Pauze / Game Over Overlay -->
+        <div class="overlay" id="overlay">
+            <div class="modal" id="modalBox">
+                <h1 id="modalTitle">🐍 Woordenschat Snake</h1>
+                <p id="modalDesc">
+                    Bestuur de slang over het grote speelveld. Boven het veld staat een begrip.
+                    Stuur naar het vak met de <b>juiste beschrijving</b> om te groeien!<br>
+                    Raak je een <b>foute beschrijving</b>? Dan ben je direct af en begint het spel opnieuw.
+                </p>
+                <div class="feedback-box" id="modalFeedback" style="display:none;"></div>
+                <button class="btn-primary" id="modalActionBtn" onclick="handleModalAction()">
+                    START SPEL (Spatie / Enter)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Onderste instructiebalk -->
+    <div class="keys-hint">
+        <span>Besturing: <kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd> of <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> &nbsp;|&nbsp; <kbd>Spatie</kbd> / <kbd>P</kbd> = Pauze</span>
+        <span>Tip: Elk bord toont 4 beschrijvingen (1 goed, 3 fout). Let goed op bij termen die op elkaar lijken!</span>
+    </div>
+</div>
+
+<script>
+    // Alle 42 begrippen & beschrijvingen
+    const VOCAB = [
+        { word: "Associatie", desc: "onwillekeurig aangeleerde verbindingen van gedachten" },
+        { word: "Extrinsiek", desc: "als iets van buitenaf komt" },
+        { word: "Confirmeren", desc: "bekrachtigen, bevestigen" },
+        { word: "Mummificeren", desc: "als lichaam balsemen" },
+        { word: "Summiere", desc: "beknopte, korte" },
+        { word: "Liquiditeit", desc: "het vermogen om direct opeisbare vorderingen uit te betalen" },
+        { word: "Eclatant", desc: "schitterend, overweldigend" },
+        { word: "Kastes", desc: "streng van elkaar afgescheiden lagen van de bevolking in de maatschappij van de hindoes" },
+        { word: "Inherent", desc: "onafscheidelijk verbonden met; van nature behorend bij" },
+        { word: "Lucratief", desc: "erg winstgevend" },
+        { word: "Dissident", desc: "andersdenkende op gebied van politiek of godsdienst" },
+        { word: "Liga", desc: "verbond" },
+        { word: "Geografie", desc: "wetenschappelijke beschrijving van de aarde" },
+        { word: "Rancune", desc: "blijvende boosheid" },
+        { word: "Pleonasme", desc: "stijlfiguur, waarbij een vaste eigenschap van een woord ten overvloede apart genoemd wordt, bijvoorbeeld: ‘een witte schimmel’" },
+        { word: "Deceptie", desc: "teleurstelling, ontgoocheling" },
+        { word: "Incisie", desc: "insnijding, snede" },
+        { word: "Infantiel", desc: "kinderlijk" },
+        { word: "Geologie", desc: "wetenschap over de bodem van de aarde" },
+        { word: "Corridor", desc: "natuurlijke (rivier, beek, bos) of half natuurlijk (houtwal, sloot, berm, wildviaduct) verbindingselementen tussen grotere natuurgebieden" },
+        { word: "Talud", desc: "helling; glooiing van dijken, spoorbanen, etc." },
+        { word: "Malaise", desc: "slechte gang van zaken, toestand van laagconjunctuur" },
+        { word: "Prijs", desc: "te betalen of betaald bedrag" },
+        { word: "Animositeit", desc: "vijandigheid" },
+        { word: "Groepage", desc: "het samen verzenden van verschillende vrachten, ter beperking van expeditiekosten" },
+        { word: "Manipuleren", desc: "beïnvloeden, in een bepaalde richting dwingen" },
+        { word: "Forceren", desc: "met geweld of met weinig passende middelen normale ontwikkeling doordrijven" },
+        { word: "Potentaat", desc: "autoritair persoon" },
+        { word: "Guerrilla", desc: "strijd van ongeregelde, kleine maar toch gewapende groepen tegen de regering" },
+        { word: "Essays", desc: "korte teksten waarin iemand zijn persoonlijke gedachten opschrijft over een bepaald onderwerp" },
+        { word: "Lectuur", desc: "leesstof, leesvoer" },
+        { word: "Altruïst", desc: "onbaatzuchtig mens, iemand bij wie anderen altijd voorop staan" },
+        { word: "Pacifist", desc: "iemand die geweld afwijst als middel om een doel te bereiken" },
+        { word: "Bourgeoisie", desc: "gevestigde burgerij, bezittende klasse" },
+        { word: "Kapitalisten", desc: "mensen die erop uit zijn veel geld te verdienen" },
+        { word: "Incourant", desc: "niet of moeilijk verkoopbaar" },
+        { word: "Decent", desc: "fatsoenlijk; eerbaar" },
+        { word: "Electorale", desc: "betrekking hebbend op verkiezingen" },
+        { word: "Cumulatieve", desc: "ophopende, toenemend" },
+        { word: "Desolaat", desc: "troosteloos; verlaten" },
+        { word: "Domicilie", desc: "woonplaats, vaste verblijfplaats" },
+        { word: "Instituut", desc: "instelling voor onderzoek of onderwijs" }
+    ];
+
+    // Canvas & Grid instellingen (groot laptop-speelveld: 48x24)
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const COLS = 48;
+    const ROWS = 24;
+    const CELL = 40; // 1920 x 960 interne resolutie -> haarscherpe tekst
+    const CARD_W = 12; // 480px breed per kaart
+    const CARD_H = 4;  // 160px hoog per kaart
+
+    // Spelstatus
+    let snake = [];
+    let dir = { dx: 1, dy: 0 };
+    let dirQueue = [];
+    let growPending = 0;
+
+    let wordOrder = [];
+    let currentIndex = 0;
+    let currentWord = null;
+    let cards = [];
+    let floatingEffects = [];
+    let flashBorder = null;
+
+    let score = 0;
+    let highScore = parseInt(localStorage.getItem('vocab_snake_highscore') || '0', 10);
+    let wrapWalls = false;
+    let soundOn = true;
+
+    let gameState = 'start'; // 'start' | 'playing' | 'paused' | 'gameover' | 'won'
+    let tickInterval = 145;
+    let lastTick = 0;
+    let animId = null;
+
+    // Web Audio API geluidjes
+    let audioCtx = null;
+    function playTone(type) {
+        if (!soundOn) return;
+        try {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            if (type === 'good') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(523.25, now);
+                osc.frequency.exponentialRampToValueAtTime(783.99, now + 0.14);
+                gain.gain.setValueAtTime(0.14, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+                osc.start(now);
+                osc.stop(now + 0.22);
+            } else if (type === 'bad') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(220, now);
+                osc.frequency.exponentialRampToValueAtTime(95, now + 0.3);
+                gain.gain.setValueAtTime(0.16, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+                osc.start(now);
+                osc.stop(now + 0.32);
+            } else if (type === 'win') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, now);
+                osc.frequency.setValueAtTime(659.25, now + 0.1);
+                osc.frequency.setValueAtTime(783.99, now + 0.2);
+                osc.frequency.setValueAtTime(1046.5, now + 0.3);
+                gain.gain.setValueAtTime(0.16, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+                osc.start(now);
+                osc.stop(now + 0.55);
+            }
+        } catch (e) {}
+    }
+
+    // Canvas exact passend schalen in laptopscherm (2:1 verhouding)
+    function fitCanvas() {
+        const wrapper = document.getElementById('boardWrapper');
+        const availW = wrapper.clientWidth - 8;
+        const availH = wrapper.clientHeight - 4;
+        const ratio = COLS / ROWS; // 2.0
+
+        let w = availW;
+        let h = w / ratio;
+        if (h > availH) {
+            h = availH;
+            w = h * ratio;
+        }
+        canvas.style.width = Math.floor(w) + 'px';
+        canvas.style.height = Math.floor(h) + 'px';
+    }
+    window.addEventListener('resize', fitCanvas);
+
+    function shuffle(arr) {
+        const copy = [...arr];
+        for (let i = copy.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [copy[i], copy[j]] = [copy[j], copy[i]];
+        }
+        return copy;
+    }
+
+    function updateHUD() {
+        document.getElementById('scoreVal').innerText = score;
+        document.getElementById('highScoreVal').innerText = highScore;
+        document.getElementById('progressVal').innerText = `${Math.min(currentIndex, VOCAB.length)} / ${VOCAB.length}`;
+        document.getElementById('lengthVal').innerText = snake.length;
+
+        const wordEl = document.getElementById('targetWordDisplay');
+        if (currentWord) {
+            wordEl.innerText = currentWord.word.toUpperCase();
+            wordEl.classList.remove('pop');
+            void wordEl.offsetWidth;
+            wordEl.classList.add('pop');
+        } else {
+            wordEl.innerText = 'KLIK OP START';
+        }
+    }
+
+    function initNewGame() {
+        // Slang begint links-midden en beweegt naar rechts
+        const startY = Math.floor(ROWS / 2);
+        snake = [
+            { x: 6, y: startY },
+            { x: 5, y: startY },
+            { x: 4, y: startY },
+            { x: 3, y: startY }
+        ];
+        dir = { dx: 1, dy: 0 };
+        dirQueue = [];
+        growPending = 0;
+
+        wordOrder = shuffle(VOCAB);
+        currentIndex = 0;
+        score = 0;
+        floatingEffects = [];
+        flashBorder = null;
+
+        nextRound();
+        gameState = 'playing';
+        hideOverlay();
+        lastTick = performance.now();
+    }
+
+    function nextRound() {
+        if (currentIndex >= wordOrder.length) {
+            triggerVictory();
+            return;
+        }
+        currentWord = wordOrder[currentIndex];
+        spawnCardsForCurrentWord();
+        updateHUD();
+    }
+
+    // Plaatst 4 beschrijvingskaarten (1 goed, 3 fout) veilig uit elkaar en vrij van de slang
+    function spawnCardsForCurrentWord() {
+        const distractors = shuffle(VOCAB.filter(v => v.word !== currentWord.word)).slice(0, 3);
+        const items = shuffle([
+            { ...currentWord, isCorrect: true },
+            ...distractors.map(d => ({ ...d, isCorrect: false }))
+        ]);
+
+        const placed = [];
+        const head = snake[0];
+
+        // Probeer eerst met ruime veiligheidsmarges, daarna iets soepeler als slang heel lang is
+        const marginLevels = [
+            { wall: 1, cardGap: 2, snakeGap: 1, headDist: 7 },
+            { wall: 1, cardGap: 1, snakeGap: 1, headDist: 5 },
+            { wall: 0, cardGap: 1, snakeGap: 0, headDist: 3 },
+            { wall: 0, cardGap: 0, snakeGap: 0, headDist: 2 }
+        ];
+
+        for (const item of items) {
+            let chosen = null;
+
+            for (const cfg of marginLevels) {
+                const maxX = COLS - CARD_W - cfg.wall;
+                const maxY = ROWS - CARD_H - cfg.wall;
+                const candidates = [];
+
+                for (let x = cfg.wall; x <= maxX; x++) {
+                    for (let y = cfg.wall; y <= maxY; y++) {
+                        candidates.push({ x, y });
+                    }
+                }
+
+                const shuffledCandidates = shuffle(candidates);
+                for (const pos of shuffledCandidates) {
+                    if (isValidCardPosition(pos.x, pos.y, placed, head, cfg)) {
+                        chosen = pos;
+                        break;
+                    }
+                }
+                if (chosen) break;
+            }
+
+            if (chosen) {
+                placed.push({
+                    x: chosen.x,
+                    y: chosen.y,
+                    w: CARD_W,
+                    h: CARD_H,
+                    word: item.word,
+                    desc: item.desc,
+                    isCorrect: item.isCorrect
+                });
+            }
+        }
+
+        cards = placed;
+    }
+
+    function isValidCardPosition(cx, cy, placedCards, head, cfg) {
+        // Check overlap met andere kaarten + tussenruimte
+        for (const c of placedCards) {
+            const overlapX = cx < c.x + c.w + cfg.cardGap && cx + CARD_W + cfg.cardGap > c.x;
+            const overlapY = cy < c.y + c.h + cfg.cardGap && cy + CARD_H + cfg.cardGap > c.y;
+            if (overlapX && overlapY) return false;
+        }
+
+        // Check directe aanrijding vlak voor de slangenkop (voorkom oneerlijk spawnen voor je neus)
+        const aheadX = head.x + dir.dx * 3;
+        const aheadY = head.y + dir.dy * 3;
+        if (aheadX >= cx - 1 && aheadX < cx + CARD_W + 1 && aheadY >= cy - 1 && aheadY < cy + CARD_H + 1) {
+            return false;
+        }
+
+        // Minimale afstand vanaf slangenkop
+        const nearX = Math.max(cx, Math.min(head.x, cx + CARD_W - 1));
+        const nearY = Math.max(cy, Math.min(head.y, cy + CARD_H - 1));
+        const distToHead = Math.abs(head.x - nearX) + Math.abs(head.y - nearY);
+        if (distToHead < cfg.headDist) return false;
+
+        // Check overlap met slangensegmenten
+        for (const seg of snake) {
+            if (
+                seg.x >= cx - cfg.snakeGap &&
+                seg.x < cx + CARD_W + cfg.snakeGap &&
+                seg.y >= cy - cfg.snakeGap &&
+                seg.y < cy + CARD_H + cfg.snakeGap
+            ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    function tick() {
+        if (dirQueue.length > 0) {
+            dir = dirQueue.shift();
+        }
+
+        let nx = snake[0].x + dir.dx;
+        let ny = snake[0].y + dir.dy;
+
+        if (wrapWalls) {
+            nx = (nx + COLS) % COLS;
+            ny = (ny + ROWS) % ROWS;
+        } else {
+            if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS) {
+                triggerGameOver('wall');
+                return;
+            }
+        }
+
+        // Staart check (laatste segment schuift weg als slang nu niet groeit)
+        const checkLen = growPending > 0 ? snake.length : snake.length - 1;
+        for (let i = 0; i < checkLen; i++) {
+            if (snake[i].x === nx && snake[i].y === ny) {
+                triggerGameOver('self');
+                return;
+            }
+        }
+
+        const newHead = { x: nx, y: ny };
+        snake.unshift(newHead);
+        if (growPending > 0) {
+            growPending--;
+        } else {
+            snake.pop();
+        }
+
+        // Controleer of de slang een beschrijvingskaart raakt
+        for (const card of cards) {
+            if (nx >= card.x && nx < card.x + card.w && ny >= card.y && ny < card.y + card.h) {
+                if (card.isCorrect) {
+                    playTone('good');
+                    score++;
+                    if (score > highScore) {
+                        highScore = score;
+                        localStorage.setItem('vocab_snake_highscore', String(highScore));
+                    }
+                    growPending += 2;
+                    flashBorder = { color: '#10b981', until: performance.now() + 260 };
+                    floatingEffects.push({
+                        x: (card.x + card.w / 2) * CELL,
+                        y: (card.y + card.h / 2) * CELL,
+                        text: `✓ GOED! (+1)`,
+                        color: '#34d399',
+                        until: performance.now() + 900
+                    });
+
+                    currentIndex++;
+                    nextRound();
+                } else {
+                    triggerGameOver('wrong_card', card);
+                }
+                return;
+            }
+        }
+
+        document.getElementById('lengthVal').innerText = snake.length;
+    }
+
+    function triggerGameOver(reason, hitCard = null) {
+        playTone('bad');
+        gameState = 'gameover';
+        flashBorder = { color: '#ef4444', until: performance.now() + 450 };
+
+        const modal = document.getElementById('modalBox');
+        const title = document.getElementById('modalTitle');
+        const desc = document.getElementById('modalDesc');
+        const fb = document.getElementById('modalFeedback');
+        const btn = document.getElementById('modalActionBtn');
+
+        modal.className = 'modal danger';
+        fb.style.display = 'block';
+
+        if (reason === 'wrong_card' && hitCard) {
+            title.innerText = '❌ Foute beschrijving! Je bent af';
+            desc.innerHTML = `Je hebt <b>${score}</b> ${score === 1 ? 'woord' : 'woorden'} goed beantwoord.`;
+            fb.innerHTML = `
+                <div class="feedback-row">
+                    <b>Gevraagd woord:</b> ${escapeHtml(currentWord.word)}
+                </div>
+                <div class="feedback-row">
+                    <span class="badge-bad">JOUW KEUZE</span>
+                    Dat was de beschrijving van <b>${escapeHtml(hitCard.word)}</b>:
+                    <i>"${escapeHtml(hitCard.desc)}"</i>
+                </div>
+                <div class="feedback-row">
+                    <span class="badge-good">JUIST ANTWOORD</span>
+                    <b>${escapeHtml(currentWord.word)}</b> = <i>"${escapeHtml(currentWord.desc)}"</i>
+                </div>
+            `;
+        } else if (reason === 'wall') {
+            title.innerText = '💥 Tegen de rand gebotst!';
+            desc.innerHTML = `Eindscore: <b>${score}</b> van de ${VOCAB.length} woorden.`;
+            fb.innerHTML = `
+                <div class="feedback-row">
+                    <span class="badge-good">TIP</span>
+                    De juiste beschrijving van <b>${escapeHtml(currentWord.word)}</b> was:<br>
+                    <i>"${escapeHtml(currentWord.desc)}"</i>
+                </div>
+            `;
+        } else {
+            title.innerText = '🐍 In je eigen staart gebeten!';
+            desc.innerHTML = `Eindscore: <b>${score}</b> van de ${VOCAB.length} woorden.`;
+            fb.innerHTML = `
+                <div class="feedback-row">
+                    <span class="badge-good">TIP</span>
+                    De juiste beschrijving van <b>${escapeHtml(currentWord.word)}</b> was:<br>
+                    <i>"${escapeHtml(currentWord.desc)}"</i>
+                </div>
+            `;
+        }
+
+        btn.innerText = '🔄 OPNIEUW BEGINNEN (Spatie / Enter)';
+        showOverlay();
+    }
+
+    function triggerVictory() {
+        playTone('win');
+        gameState = 'won';
+        const modal = document.getElementById('modalBox');
+        const title = document.getElementById('modalTitle');
+        const desc = document.getElementById('modalDesc');
+        const fb = document.getElementById('modalFeedback');
+        const btn = document.getElementById('modalActionBtn');
+
+        modal.className = 'modal success';
+        title.innerText = '🏆 Alle 42 begrippen gehaald!';
+        desc.innerHTML = `Fantastisch gedaan! Je hebt alle 42 woorden foutloos gevonden en je slang is gegroeid tot <b>${snake.length}</b> vakjes lang!`;
+        fb.style.display = 'none';
+        btn.innerText = '🔄 NOG EEN KEER SPELEN (Spatie / Enter)';
+        updateHUD();
+        showOverlay();
+    }
+
+    function showOverlay() {
+        document.getElementById('overlay').classList.remove('hidden');
+    }
+
+    function hideOverlay() {
+        document.getElementById('overlay').classList.add('hidden');
+    }
+
+    function handleModalAction() {
+        if (gameState === 'paused') {
+            togglePause();
+        } else {
+            initNewGame();
+        }
+    }
+
+    function restartGame() {
+        initNewGame();
+    }
+
+    function togglePause() {
+        if (gameState === 'playing') {
+            gameState = 'paused';
+            const modal = document.getElementById('modalBox');
+            modal.className = 'modal';
+            document.getElementById('modalTitle').innerText = '⏸️ Spel gepauzeerd';
+            document.getElementById('modalDesc').innerHTML = `Zoekwoord: <b>${escapeHtml(currentWord ? currentWord.word : '')}</b>. Neem rustig de tijd om te lezen.`;
+            document.getElementById('modalFeedback').style.display = 'none';
+            document.getElementById('modalActionBtn').innerText = '▶️ VERDER SPELEN (Spatie)';
+            document.getElementById('pauseBtn').classList.add('active');
+            showOverlay();
+        } else if (gameState === 'paused') {
+            gameState = 'playing';
+            document.getElementById('pauseBtn').classList.remove('active');
+            hideOverlay();
+            lastTick = performance.now();
+        }
+    }
+
+    function toggleWallMode() {
+        wrapWalls = !wrapWalls;
+        const btn = document.getElementById('wallToggleBtn');
+        btn.innerText = wrapWalls ? '🌀 Muren: Doorlopen' : '🧱 Muren: Af';
+        btn.classList.toggle('active', wrapWalls);
+        btn.blur();
+    }
+
+    function toggleSound() {
+        soundOn = !soundOn;
+        const btn = document.getElementById('soundToggleBtn');
+        btn.innerText = soundOn ? '🔊 Geluid: Aan' : '🔇 Geluid: Uit';
+        btn.classList.toggle('active', soundOn);
+        btn.blur();
+    }
+
+    document.getElementById('speedSelect').addEventListener('change', (e) => {
+        tickInterval = parseInt(e.target.value, 10);
+        e.target.blur();
+    });
+
+    // Besturing: Pijltjestoetsen, WASD, Spatie, Enter, P
+    window.addEventListener('keydown', (e) => {
+        const key = e.key;
+        const lower = key.toLowerCase();
+
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(key)) {
+            e.preventDefault();
+        }
+
+        if (key === ' ' || key === 'Enter') {
+            if (gameState === 'start' || gameState === 'gameover' || gameState === 'won') {
+                initNewGame();
+                return;
+            }
+            if (key === ' ') {
+                togglePause();
+                return;
+            }
+        }
+
+        if (lower === 'p' && (gameState === 'playing' || gameState === 'paused')) {
+            togglePause();
+            return;
+        }
+
+        if (gameState !== 'playing') return;
+
+        let nextDir = null;
+        if (key === 'ArrowUp' || lower === 'w') nextDir = { dx: 0, dy: -1 };
+        else if (key === 'ArrowDown' || lower === 's') nextDir = { dx: 0, dy: 1 };
+        else if (key === 'ArrowLeft' || lower === 'a') nextDir = { dx: -1, dy: 0 };
+        else if (key === 'ArrowRight' || lower === 'd') nextDir = { dx: 1, dy: 0 };
+
+        if (!nextDir) return;
+
+        const refDir = dirQueue.length > 0 ? dirQueue[dirQueue.length - 1] : dir;
+        // Verbied 180-graden draai en dubbele invoer
+        if (nextDir.dx + refDir.dx === 0 && nextDir.dy + refDir.dy === 0) return;
+        if (nextDir.dx === refDir.dx && nextDir.dy === refDir.dy) return;
+
+        if (dirQueue.length < 3) {
+            dirQueue.push(nextDir);
+        }
+    });
+
+    // Teken-functies op Canvas
+    function drawRoundedRect(x, y, w, h, r) {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + h, r);
+        ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r);
+        ctx.arcTo(x, y, x + w, y, r);
+        ctx.closePath();
+    }
+
+    function wrapLines(text, maxWidth, font) {
+        ctx.font = font;
+        const words = text.split(' ');
+        const lines = [];
+        let line = '';
+
+        for (const w of words) {
+            const test = line ? line + ' ' + w : w;
+            if (ctx.measureText(test).width > maxWidth && line) {
+                lines.push(line);
+                line = w;
+            } else {
+                line = test;
+            }
+        }
+        if (line) lines.push(line);
+        return lines;
+    }
+
+    // Zorgt dat elke beschrijving altijd netjes en scherp in het vak past
+    function drawCardText(text, px, py, pw, ph) {
+        const padX = 20;
+        const padY = 14;
+        const maxW = pw - padX * 2;
+        const maxH = ph - padY * 2;
+
+        let fontSize = 23;
+        let lines = [];
+        let lineHeight = 28;
+
+        while (fontSize >= 14) {
+            const font = `600 ${fontSize}px 'Segoe UI', system-ui, sans-serif`;
+            lines = wrapLines(text, maxW, font);
+            lineHeight = Math.round(fontSize * 1.26);
+            if (lines.length * lineHeight <= maxH) {
+                ctx.font = font;
+                break;
+            }
+            fontSize -= 1;
+        }
+
+        ctx.fillStyle = '#f8fafc';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        const totalTextH = lines.length * lineHeight;
+        const startY = py + (ph - totalTextH) / 2 + lineHeight / 2;
+
+        lines.forEach((line, idx) => {
+            ctx.fillText(line, px + pw / 2, startY + idx * lineHeight);
+        });
+    }
+
+    function render(now) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Subtiel raster op achtergrond
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.055)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let x = CELL; x < canvas.width; x += CELL) {
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, canvas.height);
+        }
+        for (let y = CELL; y < canvas.height; y += CELL) {
+            ctx.moveTo(0, y);
+            ctx.lineTo(canvas.width, y);
+        }
+        ctx.stroke();
+
+        // Beschrijvingskaarten tekenen
+        for (const card of cards) {
+            const px = card.x * CELL + 4;
+            const py = card.y * CELL + 4;
+            const pw = card.w * CELL - 8;
+            const ph = card.h * CELL - 8;
+
+            // Zachte schaduw + kaart
+            ctx.save();
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+            ctx.shadowBlur = 14;
+            ctx.shadowOffsetY = 4;
+            drawRoundedRect(px, py, pw, ph, 14);
+            ctx.fillStyle = '#15223b';
+            ctx.fill();
+            ctx.restore();
+
+            drawRoundedRect(px, py, pw, ph, 14);
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Subtiele binnenrand
+            drawRoundedRect(px + 5, py + 5, pw - 10, ph - 10, 10);
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.2)';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            drawCardText(card.desc, px, py, pw, ph);
+        }
+
+        // Slang tekenen (van staart naar kop)
+        for (let i = snake.length - 1; i >= 0; i--) {
+            const seg = snake[i];
+            const isHead = i === 0;
+            const t = snake.length > 1 ? i / (snake.length - 1) : 0;
+
+            const pad = isHead ? 2 : 4;
+            const sx = seg.x * CELL + pad;
+            const sy = seg.y * CELL + pad;
+            const size = CELL - pad * 2;
+
+            // Kleurverloop van heldergroen (kop) naar diep teal (staart)
+            const r = Math.round(16 + (1 - t) * 36);
+            const g = Math.round(145 + (1 - t) * 75);
+            const b = Math.round(135 - (1 - t) * 20);
+
+            drawRoundedRect(sx, sy, size, size, isHead ? 11 : 9);
+            ctx.fillStyle = isHead ? '#34d399' : `rgb(${r}, ${g}, ${b})`;
+            ctx.fill();
+
+            if (isHead) {
+                ctx.strokeStyle = '#ecfdf5';
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+
+                // Oogjes gericht in de bewegingsrichting
+                const cx = seg.x * CELL + CELL / 2;
+                const cy = seg.y * CELL + CELL / 2;
+                const eyeOffsetF = 7;
+                const eyeOffsetS = 8;
+
+                const e1x = cx + dir.dx * eyeOffsetF - dir.dy * eyeOffsetS;
+                const e1y = cy + dir.dy * eyeOffsetF + dir.dx * eyeOffsetS;
+                const e2x = cx + dir.dx * eyeOffsetF + dir.dy * eyeOffsetS;
+                const e2y = cy + dir.dy * eyeOffsetF - dir.dx * eyeOffsetS;
+
+                ctx.fillStyle = '#0f172a';
+                ctx.beginPath();
+                ctx.arc(e1x, e1y, 4.2, 0, Math.PI * 2);
+                ctx.arc(e2x, e2y, 4.2, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(e1x + dir.dx * 1.2, e1y + dir.dy * 1.2, 1.6, 0, Math.PI * 2);
+                ctx.arc(e2x + dir.dx * 1.2, e2y + dir.dy * 1.2, 1.6, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // Zwevende "+1 GOED!" tekstjes
+        floatingEffects = floatingEffects.filter(f => f.until > now);
+        for (const f of floatingEffects) {
+            const alpha = Math.max(0, (f.until - now) / 900);
+            const rise = (1 - alpha) * 45;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.font = "900 30px 'Segoe UI', sans-serif";
+            ctx.fillStyle = f.color;
+            ctx.textAlign = 'center';
+            ctx.fillText(f.text, f.x, f.y - rise);
+            ctx.restore();
+        }
+
+        // Kort kleurflitsje bij goed/fout
+        if (flashBorder && flashBorder.until > now) {
+            ctx.save();
+            ctx.strokeStyle = flashBorder.color;
+            ctx.lineWidth = 12;
+            ctx.globalAlpha = 0.65;
+            ctx.strokeRect(6, 6, canvas.width - 12, canvas.height - 12);
+            ctx.restore();
+        }
+    }
+
+    function escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function loop(now) {
+        if (gameState === 'playing') {
+            if (now - lastTick >= tickInterval) {
+                lastTick = now;
+                tick();
+            }
+        }
+        render(now);
+        animId = requestAnimationFrame(loop);
+    }
+
+    // Initialisatie bij laden
+    window.onload = () => {
+        fitCanvas();
+        document.getElementById('highScoreVal').innerText = highScore;
+        animId = requestAnimationFrame(loop);
+    };
+</script>
+</body>
+</html>
